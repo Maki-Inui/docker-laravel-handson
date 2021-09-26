@@ -1,0 +1,36 @@
+<?php
+
+namespace Tests\Unit\Requests;
+
+use Tests\TestCase;
+use Illuminate\Support\Facades\Validator;
+use App\Http\Requests\StorePhoto;
+use Illuminate\Http\UploadedFile;
+
+class StorePhotoTest extends TestCase
+{
+    /**
+     * A basic unit test example.
+     *
+     * @return void
+     * @dataProvider additionProvider
+     */
+    public function testStorePhoto($key, $value, bool $expect)
+    {
+        $data = [$key => $value];
+        $request = new StorePhoto();
+        $rules = $request->rules();
+        $validator = Validator::make($data, $rules);
+        $result = $validator->passes();
+        $this->assertEquals($expect, $result);
+    }
+
+    public function additionProvider()
+    {
+        return [
+            'OK' => ['image', UploadedFile::fake()->create('dummy.png'), true],
+            'ファイルが添付されていない' => ['image', null, false],
+            '画像の拡張子が違う' => ['image', UploadedFile::fake()->create('dummy.txt'), false],
+        ];
+    }
+}

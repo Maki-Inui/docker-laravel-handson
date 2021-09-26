@@ -1,0 +1,58 @@
+version: 2.1
+jobs:
+  build:
+    docker:
+      - image: circleci/php:7.3.1-apache-node-browsers 
+        environment: 
+          - APP_DEBUG: true
+          - APP_ENV: testing
+          - DB_CONNECTION: mysql
+          - DB_DATABASE: gohan_app_testing
+          - DB_USERNAME: root
+      - image: circleci/mysql:8.0.14
+        command: [--default-authentication-plugin=mysql_native_password]
+        environment:
+          - MYSQL_ALLOW_EMPTY_PASSWORD: true
+          - MYSQL_DATABASE: gohan_app_testing
+          
+    steps:
+      - checkout 
+      - run: sudo apt update
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ checksum "composer.json" }}
+            - v1-dependencies-
+      - run:
+          name: "Node.js と npm の更新"
+          command: |
+            curl -sSL "https://nodejs.org/dist/v14.17.0/node-v14.17.0-linux-x64.tar.xz" | sudo tar --strip-components=2 -xJ -C /usr/local/bin/ node-v14.17.0-linux-x64/bin/node
+            curl https://www.npmjs.com/install.sh | sudo bash
+      - run:
+          name: 現行バージョンのノードのチェック
+          command: node -v
+      - run:
+          name: Docker php extensions install
+          command: sudo docker-php-ext-install pdo_mysql
+      - run: composer install -n --prefer-dist 
+      - save_cache:
+          paths:
+            - ./vendor
+          key: v1-dependencies-{{ checksum "composer.json" }}
+      - run:
+          name: Install three libraries related to GD
+          command: sudo apt-get install -y wget git unzip libpq-dev libfreetype6-dev libjpeg62-turbo-dev libpng-dev
+      - run:
+          name: Support Freetype2 and jpeg
+          command: sudo docker-php-ext-configure gd --with-freetype --with-jpeg
+      - run: sudo docker-php-ext-configure gd --with-freetype-dir=/usr/include/ --with-jpeg-dir=/usr/include/
+      - run:
+          name: Install GD library
+          command: sudo docker-php-ext-install -j$(nproc) gd
+      - run: npm ci 
+      - run: npm run dev 
+      - run: echo "APP_KEY=" > .env.testing
+      - run: php artisan key:generate
+      - run: php artisan migrate
+      - run: 
+          name: php test 
+          command: vendor/bin/phpunit 
